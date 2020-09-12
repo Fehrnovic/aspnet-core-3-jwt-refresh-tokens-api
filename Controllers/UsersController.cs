@@ -4,6 +4,8 @@ using WebApi.Services;
 using WebApi.Models;
 using Microsoft.AspNetCore.Http;
 using System;
+using System.IdentityModel.Tokens.Jwt;
+using WebApi.Helpers;
 
 namespace WebApi.Controllers
 {
@@ -28,24 +30,39 @@ namespace WebApi.Controllers
             if (response == null)
                 return BadRequest(new { message = "Username or password is incorrect" });
 
-            setTokenCookie(response.RefreshToken);
-
             return Ok(response);
         }
 
         [AllowAnonymous]
         [HttpPost("refresh-token")]
-        public IActionResult RefreshToken()
+        public IActionResult RefreshToken([FromBody] RefreshTokenRequest model)
         {
-            var refreshToken = Request.Cookies["refreshToken"];
+            var refreshToken = model.RefreshToken;
             var response = _userService.RefreshToken(refreshToken, ipAddress());
 
             if (response == null)
                 return Unauthorized(new { message = "Invalid token" });
 
-            setTokenCookie(response.RefreshToken);
-
             return Ok(response);
+        }
+
+        [HttpGet("test")]
+        public string Test()
+        {
+            return "You are authenticated";
+        }
+
+        [HttpGet("user")]
+        public UserResponse User()
+        {
+            var token = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
+
+            var handler = new JwtSecurityTokenHandler();
+            var jsonToken = handler.ReadToken(token);
+            var tokenS = handler.ReadToken(token) as JwtSecurityToken;
+
+            var test1 = tokenS.Claims;
+            return new UserResponse { FirstName = "Test", LastName = "User", Username = "test", Id = 1 };
         }
 
         [HttpPost("revoke-token")]
@@ -65,6 +82,7 @@ namespace WebApi.Controllers
             return Ok(new { message = "Token revoked" });
         }
 
+        [Authorize(Roles = RoleEnum.Admin)]
         [HttpGet]
         public IActionResult GetAll()
         {
@@ -91,16 +109,6 @@ namespace WebApi.Controllers
         }
 
         // helper methods
-
-        private void setTokenCookie(string token)
-        {
-            var cookieOptions = new CookieOptions
-            {
-                HttpOnly = true,
-                Expires = DateTime.UtcNow.AddDays(7)
-            };
-            Response.Cookies.Append("refreshToken", token, cookieOptions);
-        }
 
         private string ipAddress()
         {
