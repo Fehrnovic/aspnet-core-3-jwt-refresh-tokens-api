@@ -10,11 +10,8 @@ namespace WebApi.Entities
         public string LastName { get; set; }
         public string Username { get; set; }
         public string Role { get; set; }
-
-        [JsonIgnore]
         public string Password { get; set; }
 
-        [JsonIgnore]
         public List<RefreshToken> RefreshTokens { get; set; }
     }
 }

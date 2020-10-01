@@ -7,6 +7,8 @@ namespace WebApi.Helpers
     {
         public DbSet<User> Users { get; set; }
 
+        public DbSet<RefreshToken> RefreshTokens { get; set; }
+
         public DataContext(DbContextOptions<DataContext> options) : base(options) { }
     }
 }
