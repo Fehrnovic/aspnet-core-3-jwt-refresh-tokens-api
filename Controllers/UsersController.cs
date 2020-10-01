@@ -4,6 +4,8 @@ using WebApi.Services;
 using WebApi.Models;
 using Microsoft.AspNetCore.Http;
 using System;
+using System.IdentityModel.Tokens.Jwt;
+using WebApi.Helpers;
 
 namespace WebApi.Controllers
 {
@@ -17,54 +19,28 @@ namespace WebApi.Controllers
         public UsersController(IUserService userService)
         {
             _userService = userService;
-        }
+        }  
 
-        [AllowAnonymous]
-        [HttpPost("authenticate")]
-        public IActionResult Authenticate([FromBody] AuthenticateRequest model)
+        [HttpGet("test")]
+        public string Test()
         {
-            var response = _userService.Authenticate(model, ipAddress());
-
-            if (response == null)
-                return BadRequest(new { message = "Username or password is incorrect" });
-
-            setTokenCookie(response.RefreshToken);
-
-            return Ok(response);
+            return "You are authenticated";
         }
 
-        [AllowAnonymous]
-        [HttpPost("refresh-token")]
-        public IActionResult RefreshToken()
+        [HttpGet("user")]
+        public UserResponse User()
         {
-            var refreshToken = Request.Cookies["refreshToken"];
-            var response = _userService.RefreshToken(refreshToken, ipAddress());
+            var token = Request.Headers["Authorization"].ToString().Replace("Bearer ", "");
 
-            if (response == null)
-                return Unauthorized(new { message = "Invalid token" });
+            var handler = new JwtSecurityTokenHandler();
+            var jsonToken = handler.ReadToken(token);
+            var tokenS = handler.ReadToken(token) as JwtSecurityToken;
 
-            setTokenCookie(response.RefreshToken);
-
-            return Ok(response);
+            var test1 = tokenS.Claims;
+            return new UserResponse { FirstName = "Test", LastName = "User", Username = "test", Id = 1, Role = "user" };
         }
 
-        [HttpPost("revoke-token")]
-        public IActionResult RevokeToken([FromBody] RevokeTokenRequest model)
-        {
-            // accept token from request body or cookie
-            var token = model.Token ?? Request.Cookies["refreshToken"];
-
-            if (string.IsNullOrEmpty(token))
-                return BadRequest(new { message = "Token is required" });
-
-            var response = _userService.RevokeToken(token, ipAddress());
-
-            if (!response)
-                return NotFound(new { message = "Token not found" });
-
-            return Ok(new { message = "Token revoked" });
-        }
-
+        [Authorize(Roles = RoleEnum.Admin)]
         [HttpGet]
         public IActionResult GetAll()
         {
@@ -79,35 +55,6 @@ namespace WebApi.Controllers
             if (user == null) return NotFound();
 
             return Ok(user);
-        }
-
-        [HttpGet("{id}/refresh-tokens")]
-        public IActionResult GetRefreshTokens(int id)
-        {
-            var user = _userService.GetById(id);
-            if (user == null) return NotFound();
-
-            return Ok(user.RefreshTokens);
-        }
-
-        // helper methods
-
-        private void setTokenCookie(string token)
-        {
-            var cookieOptions = new CookieOptions
-            {
-                HttpOnly = true,
-                Expires = DateTime.UtcNow.AddDays(7)
-            };
-            Response.Cookies.Append("refreshToken", token, cookieOptions);
-        }
-
-        private string ipAddress()
-        {
-            if (Request.Headers.ContainsKey("X-Forwarded-For"))
-                return Request.Headers["X-Forwarded-For"];
-            else
-                return HttpContext.Connection.RemoteIpAddress.MapToIPv4().ToString();
         }
     }
 }
